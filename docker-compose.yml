@@ -1,0 +1,22 @@
+services:
+  employee-rag-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: employee_rag_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/employee_management.db
+    volumes:
+      # Persist SQLite database file on host
+      - ./data:/app/data
+      # Persist ChromaDB vector store embeddings on host
+      - ./vector_store:/app/vector_store
+      # Mount config.local.yaml if you have hosted API keys (e.g. Gemini)
+      - ./config.local.yaml:/app/config.local.yaml:ro
+    extra_hosts:
+      # Allows the container to communicate with Ollama running on the host OS
+      - "host.docker.internal:host-gateway"

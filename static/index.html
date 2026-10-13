@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Employee RAG & Multi-Agent Assistant</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="header-nav">
+    <div class="brand-logo">
+      <i class="fa-solid fa-brain-circuit"></i>
+      <span>Employee RAG System</span>
+      <span class="brand-badge">SQLite + LiteLLM + ChromaDB</span>
+    </div>
+    <div class="status-pills">
+      <div class="status-pill" id="mssql-status">
+        <span class="status-dot"></span>
+        <span>SQLite Local: Connected</span>
+      </div>
+      <div class="status-pill" id="vdb-status">
+        <i class="fa-solid fa-layer-group text-info"></i>
+        <span id="vdb-count">Vector Store: 0 chunks</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid App Layout -->
+  <div class="app-container">
+    
+    <!-- Left Sidebar: Controls & Document Ingestion -->
+    <aside class="panel-card">
+      <div class="panel-header">
+        <span class="panel-title"><i class="fa-solid fa-bolt text-warning"></i> Quick Examples</span>
+      </div>
+      <div class="quick-prompts">
+        <button class="prompt-btn" onclick="sendPrompt('As per company leave policy how many leaves employee 2212 can apply for?')">
+          <i class="fa-solid fa-clipboard-question"></i>
+          <span>Leaves for Employee 2212 (Policy + DB)</span>
+        </button>
+        <button class="prompt-btn" onclick="sendPrompt('Write an email to employee 2212 to attend training keep his manager in cc.')">
+          <i class="fa-solid fa-envelope-open-text"></i>
+          <span>Email to Employee 2212 (Manager CC)</span>
+        </button>
+        <button class="prompt-btn" onclick="sendPrompt('What is the annual entitlement for Earned Leave and Sick Leave?')">
+          <i class="fa-solid fa-book-bookmark"></i>
+          <span>Company Policy RAG Rules</span>
+        </button>
+        <button class="prompt-btn" onclick="sendPrompt('Show details and manager for employee 1001')">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Employee DB Lookup</span>
+        </button>
+      </div>
+
+      <div class="panel-header" style="margin-top: 1rem;">
+        <span class="panel-title"><i class="fa-solid fa-file-arrow-up"></i> Upload Company Policy</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <input type="file" id="policy-file-input" accept=".pdf,.txt,.md" style="font-size: 0.8rem; color: var(--text-muted);">
+        <button onclick="uploadPolicy()" class="send-btn" style="width: 100%; justify-content: center;">
+          <i class="fa-solid fa-upload"></i> Upload & Vectorize
+        </button>
+        <span id="upload-status" style="font-size: 0.78rem; color: #10b981;"></span>
+      </div>
+    </aside>
+
+    <!-- Center Panel: Interactive Chat & Response Area -->
+    <main class="panel-card chat-workspace">
+      <div class="panel-header">
+        <span class="panel-title"><i class="fa-solid fa-comments"></i> Multi-Agent RAG Workspace</span>
+        <button onclick="clearChat()" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">
+          <i class="fa-solid fa-rotate-right"></i> Reset
+        </button>
+      </div>
+
+      <div class="chat-history" id="chat-history">
+        <div class="chat-bubble assistant">
+          👋 Hello! I am your Enterprise Employee RAG & Multi-Agent Assistant connected to your local **MSSQL `EmployeeManagement`** database and **ChromaDB Vector Store**.<br><br>
+          You can ask me questions about company policies, check employee leave balances, or request automated emails with line managers in CC!
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="input-box-wrapper">
+        <input type="text" id="user-input" class="chat-input" placeholder="Type your query... (e.g. As per company leave policy how many leaves employee 2212 can apply for?)" onkeydown="if(event.key==='Enter') submitQuery()">
+        <button class="send-btn" onclick="submitQuery()">
+          <span>Send</span>
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </main>
+
+    <!-- Right Sidebar: Live Multi-Agent Execution Trace & DB Inspector -->
+    <aside class="panel-card">
+      <div class="panel-header">
+        <span class="panel-title"><i class="fa-solid fa-network-wired text-info"></i> Multi-Agent Execution Trace</span>
+      </div>
+      <div class="trace-panel" id="trace-panel">
+        <div style="font-size: 0.82rem; color: var(--text-dim); text-align: center; padding: 2rem 0;">
+          Multi-agent step execution traces will appear here in real-time.
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <script>
+    async function loadHealthAndStats() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        if(data.db_connected || data.mssql_connected) {
+          const providerName = data.db_provider ? 'SQLite' : 'Database';
+          document.getElementById('mssql-status').innerHTML = `<span class="status-dot"></span><span>${providerName}: Connected</span>`;
+        }
+        document.getElementById('vdb-count').innerText = `Vector Store: ${data.vector_store.total_chunks} chunks`;
+      } catch(e) {
+        console.error("Health check error:", e);
+      }
+    }
+
+    function sendPrompt(text) {
+      document.getElementById('user-input').value = text;
+      submitQuery();
+    }
+
+    async function submitQuery() {
+      const input = document.getElementById('user-input');
+      const text = input.value.trim();
+      if(!text) return;
+
+      input.value = '';
+      appendBubble('user', text);
+
+      // Loading bubble
+      const loadingId = 'loading-' + Date.now();
+      appendBubble('assistant', '<i class="fa-solid fa-circle-notch fa-spin"></i> Multi-Agent Orchestrator thinking...', loadingId);
+
+      try {
+        const res = await fetch('/api/agent/query/stream', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({query: text, session_id: 'default-session', role: 'employee'})
+        });
+
+        document.getElementById(loadingId)?.remove();
+
+        const msgId = 'msg-' + Date.now();
+        appendBubble('assistant', '<i class="fa-solid fa-circle-notch fa-spin"></i> Thinking...', msgId);
+        const bubble = document.getElementById(msgId);
+        
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        let finalAnswer = "";
+        let emailDraft = null;
+        let traceSteps = [];
+        // Clear old traces
+        document.getElementById('trace-panel').innerHTML = "";
+
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, {stream: true});
+          let parts = buffer.split("\n\n");
+          buffer = parts.pop();
+          
+          for (let part of parts) {
+            if (part.startsWith("data: ")) {
+              const dataStr = part.substring(6);
+              try {
+                const event = JSON.parse(dataStr);
+                if (event.type === "step") {
+                  traceSteps.push(event);
+                  renderTrace(traceSteps);
+                } else if (event.type === "token") {
+                  finalAnswer += event.content;
+                  bubble.innerHTML = formatMarkdown(finalAnswer);
+                } else if (event.type === "complete") {
+                  emailDraft = event.result.email_draft;
+                  traceSteps = event.result.trace_steps || traceSteps;
+                  renderTrace(traceSteps);
+                } else if (event.type === "error") {
+                   bubble.innerHTML += `<br>⚠️ Error: ${event.message}`;
+                }
+              } catch(e) {}
+            }
+          }
+        }
+
+        if(emailDraft) {
+          const emailTo = Array.isArray(emailDraft.to) ? emailDraft.to.join(', ') : (emailDraft.to || '');
+          const emailCc = Array.isArray(emailDraft.cc) ? emailDraft.cc.join(', ') : (emailDraft.cc || '');
+          const emailSubject = emailDraft.subject || 'Email Draft';
+          const emailBody = String(emailDraft.body || emailDraft.content || finalAnswer || '');
+          const escapedBody = emailBody.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/'/g, "\\'");
+
+          bubble.innerHTML += `
+            <div class="email-card">
+              <div class="email-meta">
+                <span><strong>To:</strong> ${emailTo}</span>
+                <span><strong>CC:</strong> ${emailCc}</span>
+                <span><strong>Subject:</strong> ${emailSubject}</span>
+              </div>
+              <div class="email-body-text">${emailBody}</div>
+              <button class="copy-btn" onclick="navigator.clipboard.writeText('${escapedBody.replace(/\n/g, '\\n')}')">
+                <i class="fa-solid fa-copy"></i> Copy Email
+              </button>
+            </div>
+          `;
+        }
+        
+        loadHealthAndStats();
+      } catch(e) {
+        document.getElementById(loadingId)?.remove();
+        appendBubble('assistant', `⚠️ Error processing query: ${e.message}`);
+      }
+    }
+
+    function appendBubble(sender, htmlContent, id=null) {
+      const history = document.getElementById('chat-history');
+      const div = document.createElement('div');
+      div.className = `chat-bubble ${sender}`;
+      if(id) div.id = id;
+      div.innerHTML = htmlContent;
+      history.appendChild(div);
+      history.scrollTop = history.scrollHeight;
+    }
+
+    function renderTrace(steps) {
+      if(!steps) return;
+      const panel = document.getElementById('trace-panel');
+      panel.innerHTML = steps.map(step => `
+        <div class="trace-item">
+          <div class="trace-title">
+            <span>${step.step}</span>
+            <span style="font-size:0.75rem; color:var(--text-dim);">${step.agent || ''}</span>
+          </div>
+          <div class="trace-desc">${step.status}</div>
+          ${step.details ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${typeof step.details === 'object' ? JSON.stringify(step.details) : step.details}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function formatMarkdown(text) {
+      if(!text) return '';
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+    }
+
+    async function uploadPolicy() {
+      const fileInput = document.getElementById('policy-file-input');
+      const statusSpan = document.getElementById('upload-status');
+      if(!fileInput.files.length) {
+        statusSpan.innerText = "Please select a file first.";
+        return;
+      }
+
+      statusSpan.innerText = "Uploading & indexing...";
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        const res = await fetch('/api/policy/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        statusSpan.innerText = `Ingested: ${data.details.total_chunks} chunks indexed!`;
+        loadHealthAndStats();
+      } catch(e) {
+        statusSpan.innerText = "Upload error.";
+      }
+    }
+
+    function clearChat() {
+      document.getElementById('chat-history').innerHTML = `
+        <div class="chat-bubble assistant">
+          Workspace reset. Ask any question to start!
+        </div>
+      `;
+      document.getElementById('trace-panel').innerHTML = `<div style="font-size: 0.82rem; color: var(--text-dim); text-align: center; padding: 2rem 0;">Traces cleared.</div>`;
+    }
+
+    window.onload = () => {
+      loadHealthAndStats();
+    };
+  </script>
+</body>
+</html>

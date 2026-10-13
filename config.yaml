@@ -1,0 +1,58 @@
+llm:
+  active_profile: groq
+  profiles:
+    groq:
+      default-llm:
+        model: groq/openai/gpt-oss-120b
+        temperature: 0.2
+        max_tokens: 2048
+      fast-llm:
+        model: groq/openai/gpt-oss-20b
+        temperature: 0.1
+        max_tokens: 1024
+    ollama:
+      default-llm:
+        model: ollama/llama3.1
+        api_base: http://localhost:11434
+        temperature: 0.2
+        max_tokens: 2048
+        num_ctx: 4096
+      fast-llm:
+        model: ollama/qwen2.5:1.5b
+        api_base: http://localhost:11434
+        temperature: 0.1
+        max_tokens: 1024
+        num_ctx: 4096
+    hosted:
+      default-llm:
+        model: gemini/gemini-3.8-flash
+        temperature: 1.0
+        max_tokens: 2048
+      fast-llm:
+        model: gemini/gemini-3.5-flash-lite
+        temperature: 1.0
+        max_tokens: 1024
+
+database:
+  provider: "sqlite"
+  path: "./data/employee_management.db"
+  # Legacy MSSQL settings (kept for reference)
+  server: "localhost"
+  database: "EmployeeManagement"
+
+vector_db:
+  provider: "chromadb"
+  persist_directory: "./vector_store"
+  collection_name: "company_policies"
+  chunk_size: 500
+  chunk_overlap: 50
+
+app:
+  host: "127.0.0.1"
+  port: 8000
+
+# ── Phase feature flags (set to true to enable each upgrade phase) ──
+features:
+  use_tool_calling: true           # Phase 1: parameterised SQL tool calling
+  use_conversation_context: true   # Phase 2: session memory & query rewriting
+  use_text_to_sql: true            # Phase 4: guarded text-to-SQL

@@ -1,0 +1,21 @@
+# Python artifacts
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+
+# Logs and scratch files
+*.log
+scratch/
+
+# Tests & PDFs (not needed inside container runtime)
+tests/
+Employee_RAG_Solution_Understanding.pdf
