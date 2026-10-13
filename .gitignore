@@ -34,6 +34,8 @@ htmlcov/
 # ==============================================================================
 config.local.yaml
 *.local.yaml
+*.pem
+*.key
 .env
 .env.*
 !.env.example
