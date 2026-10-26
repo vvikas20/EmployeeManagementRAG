@@ -16,7 +16,7 @@ class VectorDBManager:
         self.collection_name = self.config.get("collection_name", "company_policies")
         self.chunk_size = self.config.get("chunk_size", 500)
         self.chunk_overlap = self.config.get("chunk_overlap", 50)
-        self.ollama_base = "http://localhost:11434"
+        self.ollama_base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.embed_model = "mxbai-embed-large"
 
         os.makedirs(self.persist_dir, exist_ok=True)

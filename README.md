@@ -34,7 +34,16 @@
 
 ## 🚀 Quick Start
 
-### Option A: Run with Docker Compose (Fastest)
+### Option A: Run Pre-Built Image from Docker Hub (Fastest)
+
+```powershell
+docker run -d -p 8000:8000 `
+  --name employee-rag-app `
+  -e GROQ_API_KEY="your-groq-api-key" `
+  vvikas20/employee-rag-system:latest
+```
+
+### Option B: Run with Docker Compose
 
 ```powershell
 # 1. Provide your Groq or Gemini API key in config.local.yaml

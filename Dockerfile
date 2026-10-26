@@ -31,6 +31,7 @@ COPY main.py /app/
 COPY mcp_server.py /app/
 COPY agents/ /app/agents/
 COPY static/ /app/static/
+COPY data/ /app/data/
 
 # Create persistent storage directories for SQLite and ChromaDB
 RUN mkdir -p /app/data /app/vector_store

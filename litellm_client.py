@@ -23,7 +23,7 @@ class LiteLLMClient:
         if not profiles:
             profiles = {"ollama": self._legacy_ollama_profile(self.full_config)}
 
-        self.active_profile = llm_config.get("active_profile", "ollama")
+        self.active_profile = os.getenv("LLM_PROFILE", llm_config.get("active_profile", "ollama"))
         if self.active_profile not in profiles:
             raise ValueError(f"Unknown LLM profile '{self.active_profile}'.")
 
@@ -32,6 +32,15 @@ class LiteLLMClient:
             alias: dict(self.profile_settings.get(alias, {}))
             for alias in ("default-llm", "fast-llm")
         }
+
+        # Support overriding Ollama base URL via environment variable (e.g. inside Docker)
+        ollama_env_base = os.getenv("OLLAMA_BASE_URL", os.getenv("OLLAMA_API_BASE"))
+        if ollama_env_base and self.active_profile == "ollama":
+            for alias in ("default-llm", "fast-llm"):
+                if alias in self.model_settings:
+                    self.model_settings[alias]["api_base"] = ollama_env_base
+            self.profile_settings["api_base"] = ollama_env_base
+
         self.default_model = self.model_settings["default-llm"].get("model", "ollama/llama3.1")
         self.fast_model = self.model_settings["fast-llm"].get("model", "ollama/qwen2.5:1.5b")
         self.api_base = self.model_settings["default-llm"].get("api_base", "http://localhost:11434")
@@ -51,6 +60,11 @@ class LiteLLMClient:
         # Configure LiteLLM global settings
         litellm.telemetry = False
         litellm.drop_params = True
+
+        if os.getenv("DISABLE_SSL_VERIFY", "true").lower() in ("1", "true", "yes"):
+            import ssl
+            ssl._create_default_https_context = ssl._create_unverified_context
+            litellm.ssl_verify = False
 
     @staticmethod
     def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,10 +92,15 @@ class LiteLLMClient:
                 for key in ("api_key", "api_base"):
                     if not options.get(key) and self.profile_settings.get(key):
                         options[key] = self.profile_settings[key]
+            if os.getenv("DISABLE_SSL_VERIFY", "true").lower() in ("1", "true", "yes"):
+                options["ssl_verify"] = False
             return options
 
         model = self.fast_model if alias == "fast-llm" else self.default_model
-        return {"model": model, "api_base": getattr(self, "api_base", None)}
+        res = {"model": model, "api_base": getattr(self, "api_base", None)}
+        if os.getenv("DISABLE_SSL_VERIFY", "true").lower() in ("1", "true", "yes"):
+            res["ssl_verify"] = False
+        return res
 
     def _safe_error(self, error: Exception) -> str:
         message = str(error)

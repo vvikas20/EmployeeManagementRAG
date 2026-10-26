@@ -19,3 +19,7 @@ scratch/
 # Tests & PDFs (not needed inside container runtime)
 tests/
 Employee_RAG_Solution_Understanding.pdf
+
+# Secrets and local configurations
+config.local.yaml
+
