@@ -6,9 +6,10 @@ The **Enterprise Employee RAG & Multi-Agent System** is a production-grade artif
 
 The architecture prioritizes zero-dependency portability and high performance:
 - Relational data is managed via an embedded **SQLite** engine, auto-seeded with 28 realistic enterprise employees across 8 departments, 5 office locations, multi-tier management reporting, and 7 leave types.
-- Policy knowledge is indexed into an embedded **ChromaDB** vector store using semantic embeddings.
+- Policy knowledge is indexed into an embedded **ChromaDB** vector store using semantic embeddings (`mxbai-embed-large`).
 - LLM inference is managed through **LiteLLM**, enabling effortless switching between cloud providers (**Groq** for ultra-fast response times, **Google AI Studio Gemini**) and offline local execution (**Ollama**).
 - The solution is containerized via **Docker & Docker Compose** with persistent host volumes for data and vector storage.
+- The web interface is engineered as a **minimalist, clean enterprise SPA** with real-time SSE streaming and a live execution trace visualizer.
 
 ---
 
@@ -18,13 +19,13 @@ The architecture prioritizes zero-dependency portability and high performance:
 | :--- | :--- | :--- |
 | **Backend API** | **Python 3.10+ / FastAPI** | Asynchronous REST endpoints, static UI serving, Server-Sent Events (SSE) streaming |
 | **Relational Database** | **SQLite (`sqlite3`)** | Self-contained relational store (`./data/employee_management.db`) with auto-seeding & safe schema view |
-| **Vector Database** | **ChromaDB (Persistent)** | Embedded vector store (`./vector_store`) indexing the 10-section Corporate Policy manual |
-| **LLM Gateway** | **LiteLLM (`config.yaml`)** | Unified model client supporting selectable profiles (`groq`, `gemini`, `ollama`) with structured JSON parsing |
+| **Vector Database** | **ChromaDB (Persistent)** | Embedded vector store (`./vector_store`) indexing the 10-section Corporate Policy manual (42 chunks) |
+| **LLM Gateway** | **LiteLLM (`config.yaml`)** | Unified model client supporting selectable profiles (`groq`, `hosted`, `ollama`) with structured JSON parsing |
 | **Cloud LLM (Primary)** | **Groq API** | High-throughput inference (`openai/gpt-oss-120b` for reasoning, `openai/gpt-oss-20b` for routing) |
-| **Cloud LLM (Alternative)** | **Google Gemini** | Hosted profile using `gemini-2.5-flash` / `gemini-2.5-flash-lite` |
+| **Cloud LLM (Alternative)** | **Google Gemini** | Hosted profile using `gemini-3.8-flash` / `gemini-3.5-flash-lite` |
 | **Local AI Services** | **Ollama** | Local profile running `llama3.1`, `qwen2.5:1.5b`, and `mxbai-embed-large` embeddings |
 | **Containerization** | **Docker & Docker Compose** | Portable microservice packaging with volume mounts for database and vector store |
-| **Frontend UI** | **HTML5 / Vanilla CSS / JS** | Light theme responsive SPA with live Multi-Agent Execution Trace Viewer & Progressive Markdown Rendering |
+| **Frontend UI** | **HTML5 / Vanilla CSS / JS** | Minimalist SaaS aesthetic (slate/zinc palette), Suggested query chips, SSE streaming, and Execution Trace Timeline |
 | **Agent Protocol** | **Model Context Protocol (MCP)** | Stdio-based server (`mcp_server.py`) for VS Code Copilot and Claude Desktop tool invocation |
 
 ---
@@ -34,9 +35,9 @@ The architecture prioritizes zero-dependency portability and high performance:
 ```mermaid
 flowchart TB
     subgraph ClientLayer["🖥️ Frontend & Client Layer"]
-        UI["Web Dashboard (index.html)"]
-        TraceUI["Live Agent Trace Visualizer"]
-        EmailUI["Email Action Studio"]
+        UI["Minimal Web Dashboard (index.html)"]
+        TraceUI["Live Agent Execution Trace Panel"]
+        EmailUI["Corporate Email Preview & Copy Card"]
         MCPHost["VS Code Copilot / MCP Host"]
     end
 
@@ -63,7 +64,7 @@ flowchart TB
         Chroma[("ChromaDB Vector Store\n(./vector_store)")]
         LiteLLM["LiteLLM Client Router\n(config.yaml)"]
         Groq["Groq API\n(gpt-oss-120b & 20b)"]
-        Gemini["Google Gemini API\n(gemini-2.5-flash)"]
+        Gemini["Google Gemini API\n(gemini-3.8-flash)"]
         Ollama["Local Ollama\n(mxbai-embed-large)"]
     end
 
@@ -98,7 +99,7 @@ flowchart TB
     EmailAgent --> LiteLLM
 
     LiteLLM -->|active_profile: groq| Groq
-    LiteLLM -->|active_profile: gemini| Gemini
+    LiteLLM -->|active_profile: hosted| Gemini
     LiteLLM -->|active_profile: ollama| Ollama
 
     Orchestrator -->|Token-by-Token SSE Stream| QueryAPI
@@ -116,7 +117,7 @@ Connects to an embedded SQLite database (`./data/employee_management.db`) using 
   - `Designations`: 24 corporate roles from C-suite to senior specialists.
   - `Locations`: 5 office centers (Bengaluru HQ, Hyderabad, Mumbai, Pune, Remote/Hybrid).
   - `LeaveTypes`: 7 categories (`CL`, `EL`, `SL`, `ML`, `PL`, `BL`, `TL`).
-  - `Employees`: 28 full employee profiles with manager hierarchies, emails, hire dates, and salary figures.
+  - `Employees`: 28 full employee profiles with manager hierarchies, corporate emails, hire dates, and salary figures.
   - `EmployeeLeaveBalances`: Available and used balances per employee.
   - `ChatSessions` & `ChatMessages`: Multi-turn conversational persistence.
 - **Auto-Initialization & Seeding:** On startup, automatically creates tables and seeds full enterprise records if employee count is below threshold.
@@ -125,12 +126,18 @@ Connects to an embedded SQLite database (`./data/employee_management.db`) using 
 ### 4.2. Vector Storage & Ingestion (`vector_db.py`)
 Indexes company policies into an embedded persistent ChromaDB collection.
 - **Document Chunking:** Recursive paragraph and sentence chunking (`chunk_size=500`, `chunk_overlap=50`).
-- **Embeddings:** Generates vector representations via Ollama's `mxbai-embed-large` (1024 dimensions) with resilient timeout and fallback handling.
-- **Policy Ingestion:** Automatically ingests the 10-section [`sample_policy.md`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/sample_policy.md) (42 chunks).
+- **Embeddings:** Generates vector representations via Ollama's `mxbai-embed-large` (1024 dimensions) with resilient timeout and fast fallback handling.
+- **Policy Ingestion:** Automatically ingests the 10-section [`sample_policy.md`](./sample_policy.md) (42 chunks).
 
 ### 4.3. Multi-Agent Engine (`agents/`)
-- **`memory_agent.py`:** Analyzes recent chat turns to resolve pronouns ("his manager", "her leave balance", "write him an email") to active entity IDs (e.g. `EMP4001`) before routing, avoiding redundant clarification loops.
-- **`router_agent.py`:** Employs the `fast-llm` model to classify incoming queries into six functional intents with strict JSON schemas.
+- **`memory_agent.py`:** Analyzes recent chat turns to resolve pronouns ("his manager", "her leave balance", "write an email to her") to active entity IDs (e.g. `EMP8000`) before routing, avoiding redundant clarification loops. Enforces ~1000 token budgeting on history context.
+- **`router_agent.py`:** Employs the `fast-llm` model to classify incoming queries into six functional intents with strict JSON schemas:
+  1. `COMPANY_STATS_QUERY`: Company-wide employee counts and department metrics.
+  2. `EMAIL_ACTION`: Drafting formal corporate emails.
+  3. `HYBRID_POLICY_EMPLOYEE`: Questions combining company policy rules with individual employee balances.
+  4. `EMPLOYEE_SQL_QUERY`: Queries asking for a specific employee's profile or leave balances.
+  5. `CUSTOM_SQL_QUERY`: Ad-hoc or complex database queries.
+  6. `POLICY_QUERY`: General policy, benefits, and HR guidelines.
 - **`tool_agent.py` & `sql_tools.py`:** Autonomous agent loop using function calling against safe, parameterized SQL primitives (`get_employee_profile`, `get_leave_balance`, `get_team_members`, `get_department_stats`).
 - **`text_to_sql_agent.py`:** Generates arbitrary SQLite analytical queries guarded by `sqlglot` (enforcing `SELECT`-only statements, banning mutation keywords, and enforcing `LIMIT 50`).
 - **`email_agent.py`:** Synthesizes professional corporate communications with recipient validation and manager CC lookups.
@@ -173,7 +180,7 @@ sequenceDiagram
     alt If Structured Employee Query (Tool Calling)
         Orch->>Tool: run_stream()
         Tool->>LLM: Reason & choose tool
-        LLM-->>Tool: Tool Call: get_employee_profile(EMP4001)
+        LLM-->>Tool: Tool Call: get_employee_profile(EMP8000)
         Tool->>DB: Parameterized SQLite Query
         DB-->>Tool: Employee record
     else If Analytical Ad-Hoc SQL
@@ -202,20 +209,20 @@ sequenceDiagram
 
 ---
 
-## 6. Multi-Agent Intent Routing Logic
+## 6. Interactive Debugging Architecture
+
+The system supports granular step debugging across all agent execution stages via standard IDE debuggers:
 
 ```mermaid
-graph TD
-    Query[User Query] --> Router{Supervisor Router Agent}
-    
-    Router -->|COMPANY_STATS| ToolTrack["Tool Calling Agent<br>(get_department_stats)"]
-    Router -->|EMPLOYEE_SQL| ToolTrack
-    Router -->|HYBRID_POLICY_EMPLOYEE| HybridTrack["Multi-Agent Synthesis<br>(Tool Agent + Policy RAG)"]
-    
-    Router -->|CUSTOM_SQL_QUERY| AdHocTrack["Text-to-SQL Agent<br>(sqlglot Validated SQLite)"]
-    Router -->|POLICY_QUERY| PolicyTrack["Policy RAG Agent<br>(ChromaDB Cosine Retrieval)"]
-    Router -->|EMAIL_ACTION| EmailTrack["Email Synthesizer Agent<br>(Manager CC + Action Draft)"]
+flowchart LR
+    A["Breakpoint 1:<br>memory_agent.py (L56)"] --> B["Breakpoint 2:<br>router_agent.py (L17)"]
+    B --> C["Breakpoint 3:<br>orchestrator.py (L408)"]
+    C --> D["Breakpoint 4:<br>sql_tools.py (L165)"]
+    C --> E["Breakpoint 5:<br>policy_agent.py (L17)"]
+    C --> F["Breakpoint 6:<br>email_agent.py (L12)"]
 ```
+
+Developers can attach the Python debugger (`F5`) to inspect runtime variables (`session_id`, `emp_data`, `retrieved_chunks`, `tool_calls_made`) and step through decisions before responses stream to the client.
 
 ---
 
@@ -223,7 +230,7 @@ graph TD
 
 1. **Local Data Sovereignty:** Relational data (`./data/employee_management.db`) and vector indices (`./vector_store/`) are stored locally on disk and never uploaded to external databases.
 2. **Read-Only AST Validation:** All Text-to-SQL outputs pass through `sqlglot` AST parsing. Statements containing `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, or `ATTACH` are blocked before reaching SQLite.
-3. **Sensitive Field Redaction:** The schema provided to the LLM for custom SQL explicitly omits sensitive financial columns such as `Salary`.
+3. **Sensitive Field Protection:** Ad-hoc SQL schemas redact sensitive financial columns like `Salary` by default.
 4. **Parameterized Primitives:** Standard profile lookups and leave calculations use bound parameters (`?`), preventing SQL injection.
 5. **Row Retrieval Caps:** Ad-hoc queries automatically enforce `LIMIT 50` to mitigate denial-of-service and memory exhaustion.
 6. **Credential Hygiene:** Cloud LLM API keys (`GROQ_API_KEY`, `GEMINI_API_KEY`) reside exclusively in git-ignored `config.local.yaml`.

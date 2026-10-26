@@ -9,10 +9,10 @@
 
 ```mermaid
 flowchart TB
-    subgraph ClientLayer["🖥️ Frontend UI Layer (Light Mode SPA)"]
+    subgraph ClientLayer["🖥️ Frontend UI Layer (Minimalist SPA)"]
         UI["Web Workspace (index.html / styles.css)"]
-        TraceUI["Live Agent Trace Visualizer"]
-        EmailUI["Email Action Studio"]
+        TraceUI["Live Agent Execution Trace Panel"]
+        EmailUI["Corporate Email Preview & Copy Studio"]
         MCPHost["VS Code Copilot / MCP Host"]
     end
 
@@ -20,7 +20,6 @@ flowchart TB
         HealthAPI["GET /api/health"]
         UploadAPI["POST /api/policy/upload"]
         QueryAPI["POST /api/agent/query/stream (SSE)"]
-        EmpAPI["GET /api/employees"]
     end
 
     subgraph AgentLayer["🤖 Multi-Agent Orchestration Engine (agents/)"]
@@ -29,6 +28,7 @@ flowchart TB
         Supervisor["Supervisor Router Agent (router_agent.py)"]
         PolicyAgent["Policy RAG Agent (policy_agent.py)"]
         ToolAgent["Tool Calling Agent (tool_agent.py)"]
+        TextToSQLAgent["Text-to-SQL Agent (text_to_sql_agent.py)"]
         SQLAgent["Employee SQL Agent (sql_agent.py)"]
         EmailAgent["Email Synthesizer Agent (email_agent.py)"]
         MCPServer["Local MCP Server (mcp_server.py, stdio)"]
@@ -39,7 +39,7 @@ flowchart TB
         Chroma[("ChromaDB Vector Store\n(./vector_store)")]
         LiteLLM["LiteLLM Client\n(selectable profiles in config.yaml)"]
         Groq["Groq API\n(gpt-oss-120b / gpt-oss-20b)"]
-        Gemini["Google Gemini API\n(gemini-2.5-flash)"]
+        Gemini["Google Gemini API\n(gemini-3.8-flash)"]
         Ollama["Local Ollama\n(mxbai-embed-large)"]
     end
 
@@ -70,7 +70,7 @@ flowchart TB
     Supervisor --> LiteLLM
     
     LiteLLM -->|active profile: groq| Groq
-    LiteLLM -->|active profile: gemini| Gemini
+    LiteLLM -->|active profile: hosted| Gemini
     LiteLLM -->|active profile: ollama| Ollama
     
     Orchestrator -->|Synthesized Output + Traces| QueryAPI
@@ -83,18 +83,18 @@ flowchart TB
 
 | Subsystem | File Reference | Primary Function |
 | :--- | :--- | :--- |
-| **FastAPI Web Server** | [`main.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/main.py) | REST API endpoints (`/api/agent/query/stream`, `/api/policy/upload`, `/api/health`, `/api/employees`) and static SPA hosting. |
-| **Relational Database** | [`database.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/database.py) | Self-contained SQLite database (`./data/employee_management.db`), auto-seeded with 28 employees, 8 departments, 24 designations, 7 leave types, and safe schema projection. |
-| **Vector DB Store** | [`vector_db.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/vector_db.py) | ChromaDB persistent store indexing the 10-section Corporate Policy manual with local embedding generation and fallback handling. |
-| **LLM Gateway** | [`litellm_client.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/litellm_client.py), [`config.yaml`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/config.yaml) | Unified interface supporting Groq (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`), Google Gemini (`gemini-2.5-flash`), and local Ollama (`llama3.1`). |
-| **Memory Agent** | [`agents/memory_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/memory_agent.py) | Context-aware pronoun and entity resolution across multi-turn sessions (e.g. mapping "write him an email" to `EMP4001`). |
-| **Supervisor Router** | [`agents/router_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/router_agent.py) | Classifies query intent into `COMPANY_STATS_QUERY`, `POLICY_QUERY`, `EMPLOYEE_SQL_QUERY`, `HYBRID_POLICY_EMPLOYEE`, `CUSTOM_SQL_QUERY`, or `EMAIL_ACTION`. |
-| **Tool Calling Agent** | [`agents/tool_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/tool_agent.py), [`agents/sql_tools.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/sql_tools.py) | Executes parameterized queries (`get_employee_profile`, `get_leave_balance`, `get_team_members`, `get_department_stats`). |
-| **Text-to-SQL Agent** | [`agents/text_to_sql_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/text_to_sql_agent.py) | Generates read-only SQLite analytical queries protected by `sqlglot` AST safety rules. |
-| **Policy RAG Agent** | [`agents/policy_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/policy_agent.py) | Semantic search on ChromaDB policy vectors and RAG context synthesis. |
-| **Email Agent** | [`agents/email_agent.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/email_agent.py) | Crafts professional corporate emails with `To`, `CC` (Manager), `Subject`, and formatted `Body`. |
-| **Multi-Agent Coordinator** | [`agents/orchestrator.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/agents/orchestrator.py) | Manages state machine transitions and streams real-time execution traces. |
-| **MCP Server** | [`mcp_server.py`](file:///c:/D/Playground/Gen%20AI/EmployeeManagementRAGSystem/mcp_server.py) | Exposes multi-agent tools over standard I/O for VS Code Copilot and Claude Desktop. |
+| **FastAPI Web Server** | [`main.py`](./main.py) | REST API endpoints (`/api/agent/query/stream`, `/api/policy/upload`, `/api/health`) and static SPA hosting. |
+| **Relational Database** | [`database.py`](./database.py) | Self-contained SQLite database (`./data/employee_management.db`), auto-seeded with 28 employees, 8 departments, 24 designations, 7 leave types, and safe schema projection. |
+| **Vector DB Store** | [`vector_db.py`](./vector_db.py) | ChromaDB persistent store indexing the 10-section Corporate Policy manual (42 chunks) with embedding generation and fallback handling. |
+| **LLM Gateway** | [`litellm_client.py`](./litellm_client.py), [`config.yaml`](./config.yaml) | Unified interface supporting Groq (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`), Google Gemini (`gemini-3.8-flash`), and local Ollama (`llama3.1`). |
+| **Memory Agent** | [`agents/memory_agent.py`](./agents/memory_agent.py) | Context-aware pronoun and entity resolution across multi-turn sessions (e.g. mapping "write an email to her" to `EMP8000`). |
+| **Supervisor Router** | [`agents/router_agent.py`](./agents/router_agent.py) | Classifies query intent into `COMPANY_STATS_QUERY`, `POLICY_QUERY`, `EMPLOYEE_SQL_QUERY`, `HYBRID_POLICY_EMPLOYEE`, `CUSTOM_SQL_QUERY`, or `EMAIL_ACTION`. |
+| **Tool Calling Agent** | [`agents/tool_agent.py`](./agents/tool_agent.py), [`agents/sql_tools.py`](./agents/sql_tools.py) | Executes parameterized queries (`get_employee_profile`, `get_leave_balance`, `get_team_members`, `get_department_stats`). |
+| **Text-to-SQL Agent** | [`agents/text_to_sql_agent.py`](./agents/text_to_sql_agent.py) | Generates read-only SQLite analytical queries protected by `sqlglot` AST safety rules. |
+| **Policy RAG Agent** | [`agents/policy_agent.py`](./agents/policy_agent.py) | Semantic search on ChromaDB policy vectors and RAG context synthesis. |
+| **Email Agent** | [`agents/email_agent.py`](./agents/email_agent.py) | Crafts professional corporate emails with `To`, `CC` (Manager), `Subject`, and formatted `Body`. |
+| **Multi-Agent Coordinator** | [`agents/orchestrator.py`](./agents/orchestrator.py) | Manages state machine transitions and streams real-time execution traces. |
+| **MCP Server** | [`mcp_server.py`](./mcp_server.py) | Exposes multi-agent tools over standard I/O for VS Code Copilot and Claude Desktop. |
 
 ---
 
@@ -128,7 +128,7 @@ sequenceDiagram
     
     Orch->>Tool: run_stream()
     Tool->>LLM: Model chooses function call
-    LLM-->>Tool: Call get_employee_profile("EMP4001")
+    LLM-->>Tool: Call get_employee_profile("EMP8000")
     Tool->>DB: Parameterized SQLite lookup
     DB-->>Tool: Employee record
     
@@ -148,6 +148,7 @@ sequenceDiagram
 
 ## 4. Deployment & Infrastructure
 
-- **Zero External Dependencies**: Operates with zero requirement for external SQL server instances or client drivers.
+- **Zero External Dependencies**: Operates with zero requirement for external SQL server instances or client drivers via embedded SQLite.
 - **Dockerized Architecture**: Packaged as a single container via `Dockerfile` and `docker-compose.yml` with persistent storage for `./data` and `./vector_store`.
 - **Health Verification**: `/api/health` exposes database status, vector count, and active LLM profile.
+- **Debugging & Observability**: Integrated with VS Code debug launch profiles and live SSE trace streaming.

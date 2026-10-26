@@ -99,8 +99,13 @@ Example configuration excerpt (the actual model and values are read from `config
 
 ```yaml
 llm:
-  active_profile: hosted
+  active_profile: groq
   profiles:
+    groq:
+      default-llm:
+        model: groq/openai/gpt-oss-120b
+        temperature: 0.2
+        max_tokens: 2048
     ollama:
       default-llm:
         model: ollama/llama3.1
@@ -252,7 +257,7 @@ Not every question should use vector search:
 This project has two database interaction patterns:
 
 1. **Parameterized tools:** the LLM chooses from predefined functions such as retrieving a profile or leave balance. The application validates arguments and executes SQL. This narrows the model's actions to known operations.
-2. **Text-to-SQL:** an LLM translates a natural-language analytics request into T-SQL. The application parses the query with `sqlglot`, permits a `SELECT`, applies a row limit if missing, and then executes it. This is more flexible than fixed tools and requires careful validation.
+2. **Text-to-SQL:** an LLM translates a natural-language analytics request into SQLite SQL. The application parses the query with `sqlglot`, permits a `SELECT`, applies a row limit if missing, and then executes it. This is more flexible than fixed tools and requires careful validation.
 
 The difference:
 
